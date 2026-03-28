@@ -2,6 +2,30 @@ const Inventory = require("../models/Inventory");
 const asyncHandler = require("../utils/asyncHandler");
 const logActivity = require("../utils/activityLogger");
 
+const serializeLabResult = (result = {}) => {
+  const hivPositive = Boolean(result.hiv);
+  const hepPositive = Boolean(result.hep);
+  const malariaPositive = Boolean(result.malaria);
+  const hasPositiveMarker = hivPositive || hepPositive || malariaPositive;
+
+  return {
+    hiv: hivPositive,
+    hep: hepPositive,
+    malaria: malariaPositive,
+    hivPositive,
+    hepPositive,
+    malariaPositive,
+    reason: result.reason || "",
+    testedAt: result.testedAt,
+    overallResult: hasPositiveMarker ? "TESTED_POSITIVE" : "TESTED_SAFE",
+    positiveMarkers: [
+      hivPositive ? "HIV" : null,
+      hepPositive ? "HEPATITIS" : null,
+      malariaPositive ? "MALARIA" : null
+    ].filter(Boolean)
+  };
+};
+
 const getInventory = asyncHandler(async (req, res) => {
   const items = await Inventory.find({}).sort({ collectedAt: -1 });
   res.status(200).json(
@@ -13,7 +37,8 @@ const getInventory = asyncHandler(async (req, res) => {
       status: item.status,
       safetyFlag: item.safetyFlag,
       testStatus: item.testStatus,
-      collectedAt: item.collectedAt
+      collectedAt: item.collectedAt,
+      latestLabResult: item.labResults?.length ? serializeLabResult(item.labResults[item.labResults.length - 1]) : null
     }))
   );
 });
@@ -46,7 +71,7 @@ const getLabResults = asyncHandler(async (req, res) => {
     throw new Error("Inventory item not found");
   }
 
-  res.status(200).json(item.labResults || []);
+  res.status(200).json((item.labResults || []).map(serializeLabResult));
 });
 
 const updateLabTest = asyncHandler(async (req, res) => {
@@ -87,13 +112,22 @@ const updateLabTest = asyncHandler(async (req, res) => {
 const getLowStockAlerts = asyncHandler(async (req, res) => {
   const standardTypes = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
   
+  // Calculate expiry date (42 days ago)
+  const expiryLimit = new Date();
+  expiryLimit.setDate(expiryLimit.getDate() - 42);
+
   const pipeline = [
     {
       $match: {
-        $or: [
-          { safetyFlag: "SAFE" },
-          { status: "AVAILABLE" },
-          { status: "SAFE" }
+        $and: [
+          {
+            $or: [
+              { safetyFlag: "SAFE" },
+              { status: "AVAILABLE" },
+              { status: "SAFE" }
+            ]
+          },
+          { collectedAt: { $gte: expiryLimit } }
         ]
       }
     },

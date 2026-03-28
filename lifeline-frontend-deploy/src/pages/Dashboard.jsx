@@ -5,6 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import loginBackground from '../assets/loginpage.png';
 import { Package, FlaskConical, Hospital, ShieldCheck, Stethoscope, Heart, CalendarDays, MapPin, Activity, CheckCircle2, AlertTriangle, Clock } from 'lucide-react';
 
+const ALERT_REFRESH_INTERVAL_MS = 15000;
+
 const Dashboard = () => {
     const navigate = useNavigate();
     const {
@@ -69,6 +71,67 @@ const Dashboard = () => {
             });
     }, [canViewInventory]);
 
+    useEffect(() => {
+        const refreshActivity = () => {
+            api.get('/api/activity/recent')
+                .then(res => {
+                    setRecentActivity(res.data || []);
+                    setActivityError(false);
+                })
+                .catch(err => {
+                    console.error('Error refreshing recent activity', err);
+                    setActivityError(true);
+                });
+        };
+
+        const refreshLowStock = () => {
+            api.get('/api/inventory/low-stock')
+                .then(res => setLowStock(res.data || []))
+                .catch(() => setLowStock([]));
+        };
+
+        const refreshInventory = () => {
+            if (!canViewInventory) {
+                setInventory([]);
+                setInventoryError(false);
+                return;
+            }
+
+            api.get('/api/inventory')
+                .then(res => {
+                    setInventory(res.data || []);
+                    setInventoryError(false);
+                })
+                .catch(err => {
+                    console.error('Error refreshing inventory', err);
+                    setInventoryError(true);
+                });
+        };
+
+        const refreshSignals = () => {
+            refreshActivity();
+            refreshLowStock();
+            refreshInventory();
+        };
+
+        const intervalId = window.setInterval(refreshSignals, ALERT_REFRESH_INTERVAL_MS);
+        const handleFocus = () => refreshSignals();
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                refreshSignals();
+            }
+        };
+
+        window.addEventListener('focus', handleFocus);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            window.clearInterval(intervalId);
+            window.removeEventListener('focus', handleFocus);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [canViewInventory]);
+
     const formatTimeAgo = (timestamp) => {
         if (!timestamp) return 'Just now';
         const date = new Date(timestamp);
@@ -83,21 +146,6 @@ const Dashboard = () => {
         return `${diffDays} days ago`;
     };
 
-    const criticalAlerts = useMemo(() => {
-        const alerts = [];
-        inventory.forEach(item => {
-            const status = (item.status || '').toUpperCase();
-            const safety = (item.safetyFlag || '').toUpperCase();
-            const qty = typeof item.quantity === 'number' ? item.quantity : null;
-            const lowByQty = qty !== null && qty <= 2;
-            const lowByStatus = status.includes('LOW') || status.includes('CRITICAL');
-            const unsafe = safety.includes('BIO') || status.includes('DISCARD');
-            if (lowByQty || lowByStatus || unsafe) {
-                alerts.push(item);
-            }
-        });
-        return alerts;
-    }, [inventory]);
 
     const emergencyAlerts = useMemo(() => {
         return recentActivity.filter(item => {
@@ -221,13 +269,13 @@ const Dashboard = () => {
                     <h3 style={{ color: 'white', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}><AlertTriangle size={22} color="white" /> Critical Alerts</h3>
                     <div style={{ fontSize: '3rem', fontWeight: 'bold' }}>
                         {canViewInventory
-                            ? (inventoryLoading ? '...' : criticalAlerts.length)
+                            ? (inventoryLoading ? '...' : lowStock.length)
                             : emergencyAlerts.length}
                     </div>
                     <p style={{ opacity: 0.9 }}>
                         {canViewInventory && inventoryLoading && 'Checking stock levels...'}
-                        {canViewInventory && !inventoryLoading && criticalAlerts.length === 0 && 'No critical inventory alerts.'}
-                        {canViewInventory && !inventoryLoading && criticalAlerts.length > 0 && `Inventory alerts: ${criticalAlerts.length} item(s)`}
+                        {canViewInventory && !inventoryLoading && lowStock.length === 0 && 'No critical inventory alerts.'}
+                        {canViewInventory && !inventoryLoading && lowStock.length > 0 && `Critical stock for ${lowStock.length} blood type${lowStock.length !== 1 ? 's' : ''}.`}
                         {!canViewInventory && (emergencyAlerts.length > 0 ? `Emergency alerts: ${emergencyAlerts.length}` : 'No emergency alerts.')}
                         {emergencyAlerts.length > 0 && canViewInventory && ` • Emergency alerts: ${emergencyAlerts.length}`}
                     </p>
