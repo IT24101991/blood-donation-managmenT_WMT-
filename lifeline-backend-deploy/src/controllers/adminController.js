@@ -1,5 +1,8 @@
 const User = require("../models/User");
+const Donor = require("../models/Donor");
 const asyncHandler = require("../utils/asyncHandler");
+
+const { serializeDonor } = require("../utils/serializers");
 
 const getUsers = asyncHandler(async (req, res) => {
   const users = await User.find({}).select("-password").sort({ createdAt: -1 });
@@ -11,6 +14,13 @@ const getUsers = asyncHandler(async (req, res) => {
       role: user.role
     }))
   );
+});
+
+const getDonors = asyncHandler(async (req, res) => {
+  console.log(`[AdminController] getDonors called by user: ${req.user?._id} (${req.user?.role})`);
+  const donors = await Donor.find({}).populate("user", "name email role").sort({ createdAt: -1 });
+  console.log(`[AdminController] Found ${donors.length} donors`);
+  res.status(200).json(donors.map(serializeDonor));
 });
 
 const createUser = asyncHandler(async (req, res) => {
@@ -64,5 +74,6 @@ const updateUserRole = asyncHandler(async (req, res) => {
 module.exports = {
   getUsers,
   createUser,
-  updateUserRole
+  updateUserRole,
+  getDonors
 };

@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "Lifeline",
+    "slug": "lifeline-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/lifeline_logo.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/lifeline_logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.lifeline.mobile",
+      "buildNumber": "1.0.0"
+    },
+    "android": {
+      "package": "com.lifeline.mobile",
+      "versionCode": 1,
+      "permissions": [],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/lifeline_logo.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": false,
+      "splash": {
+        "image": "./assets/lifeline_logo.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff"
+      }
+    },
+    "web": {
+      "favicon": "./assets/lifeline_logo.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "633deb33-0a46-449c-8663-1bb36b611dd8"
+      }
+    }
+  }
+}
